@@ -1,6 +1,7 @@
 package com.mokal147.videograb;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.view.Gravity;
@@ -48,6 +49,23 @@ public class MainActivity extends Activity {
         radio.setText(text);
         radio.setTextSize(15);
         return radio;
+    }
+
+    private void startTermuxDownload(String url, String mode, String start, String end) {
+        Intent intent = new Intent();
+        intent.setClassName("com.termux", "com.termux.app.RunCommandService");
+        intent.setAction("com.termux.RUN_COMMAND");
+        intent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/home/.termux/tasker/videograb-download");
+        intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{url, mode, start, end});
+        intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
+        intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+        intent.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0");
+        try {
+            startService(intent);
+            Toast.makeText(this, "تم إرسال طلب التنزيل إلى Termux", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذر تشغيل Termux: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
@@ -146,9 +164,44 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            status.setText(
-                "تم استلام الرابط. سنضيف تحليل الروابط في المرحلة التالية."
-            );
+            String mode = typeGroup.getCheckedRadioButtonId() == 2
+                ? "audio"
+                : "video";
+
+            String start = "";
+            String end = "";
+
+            if (rangeGroup.getCheckedRadioButtonId() == 4) {
+                start = startInput.getText().toString().trim();
+                end = endInput.getText().toString().trim();
+
+                if (!start.matches("\\d{2}:\\d{2}:\\d{2}")
+                    || !end.matches("\\d{2}:\\d{2}:\\d{2}")) {
+                    Toast.makeText(this, "اكتب الوقت بصيغة 00:00:30", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                String[] a = start.split(":");
+                String[] b = end.split(":");
+
+                int startSeconds = Integer.parseInt(a[0]) * 3600
+                    + Integer.parseInt(a[1]) * 60
+                    + Integer.parseInt(a[2]);
+
+                int endSeconds = Integer.parseInt(b[0]) * 3600
+                    + Integer.parseInt(b[1]) * 60
+                    + Integer.parseInt(b[2]);
+
+                if (Integer.parseInt(a[1]) > 59 || Integer.parseInt(a[2]) > 59
+                    || Integer.parseInt(b[1]) > 59 || Integer.parseInt(b[2]) > 59
+                    || endSeconds <= startSeconds) {
+                    Toast.makeText(this, "تأكد أن الوقت صحيح وأن النهاية بعد البداية.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+            }
+
+            status.setText("جارٍ إرسال طلب التنزيل إلى Termux...");
+            startTermuxDownload(url, mode, start, end);
         });
 
         scrollView.addView(layout);
